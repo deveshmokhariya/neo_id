@@ -1,0 +1,573 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Candidate Lookup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a navy title bar, a row of dataset figures, then one working column: search, record card. */
+:root{
+  --bg:#f1f4f8;
+  --surface:#ffffff;
+  --surface-2:#f6f8fb;
+  --ink:#101c2e;
+  --muted:#5a6a7e;
+  --line:#dbe2ea;
+  --bar:#0f2547;
+  --bar-ink:#ffffff;
+  --bar-muted:#a9b9d3;
+  --accent:#1d5fd1;
+  --accent-ink:#ffffff;
+  --accent-soft:#e4edfb;
+  --good:#17703f;
+  --good-soft:#e1f3e8;
+  --warn:#8a5a00;
+  --warn-soft:#fbf0d9;
+  --bad:#a3302a;
+  --bad-soft:#f9e3e1;
+  --shadow:0 1px 2px rgba(16,28,46,.06),0 4px 14px rgba(16,28,46,.05);
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0c121b;--surface:#141d29;--surface-2:#1a2534;--ink:#e8eef5;--muted:#93a3b6;--line:#263344;
+    --bar:#0a1a33;--bar-ink:#ffffff;--bar-muted:#8ea3c4;
+    --accent:#6fa3f5;--accent-ink:#07142b;--accent-soft:#172a4a;
+    --good:#6fd39a;--good-soft:#14301f;--warn:#e6b85c;--warn-soft:#33290f;--bad:#f08a82;--bad-soft:#3a1d1b;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0c121b;--surface:#141d29;--surface-2:#1a2534;--ink:#e8eef5;--muted:#93a3b6;--line:#263344;
+  --bar:#0a1a33;--bar-ink:#ffffff;--bar-muted:#8ea3c4;
+  --accent:#6fa3f5;--accent-ink:#07142b;--accent-soft:#172a4a;
+  --good:#6fd39a;--good-soft:#14301f;--warn:#e6b85c;--warn-soft:#33290f;--bad:#f08a82;--bad-soft:#3a1d1b;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;padding-bottom:56px}
+.gutter{
+  max-width:960px;margin:0 auto;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+}
+/* title bar: its navy ground runs up under the phone's status strip */
+.bar{
+  background:var(--bar);color:var(--bar-ink);
+  margin-top:calc(-1 * env(safe-area-inset-top,0px));
+  padding-top:env(safe-area-inset-top,0px);
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.bar .gutter{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;padding-block:18px}
+.brand{display:flex;align-items:center;gap:12px;min-width:0}
+.mark{flex:none;width:38px;height:38px;border-radius:9px;background:rgba(255,255,255,.1);display:grid;place-items:center;border:1px solid rgba(255,255,255,.16)}
+.mark svg{display:block}
+h1{margin:0;font-size:1.25rem;line-height:1.2;font-weight:600;letter-spacing:-.005em}
+.sub{margin:1px 0 0;color:var(--bar-muted);font-size:.8125rem}
+button,.btn{
+  font:inherit;font-size:.875rem;font-weight:500;color:var(--ink);background:var(--surface);
+  border:1px solid var(--line);border-radius:7px;padding:8px 13px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;line-height:1.2;
+}
+button:hover,.btn:hover{border-color:var(--muted)}
+.btn.on-bar{background:rgba(255,255,255,.08);color:var(--bar-ink);border-color:rgba(255,255,255,.22)}
+.btn.on-bar:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.4)}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+button.primary:hover{filter:brightness(1.07);border-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar :focus-visible{outline-color:#fff}
+input[type=file]{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.file-btn{position:relative}
+.file-btn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+.bar .file-btn:focus-within{outline-color:#fff}
+
+main{display:flex;flex-direction:column;gap:18px;padding-top:22px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;box-shadow:var(--shadow);min-width:0}
+.stat b{display:block;font-size:1.45rem;line-height:1.2;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.stat span{color:var(--muted);font-size:.78rem;letter-spacing:.03em}
+.notice{
+  display:flex;gap:10px;align-items:flex-start;background:var(--warn-soft);color:var(--warn);
+  border-radius:8px;padding:10px 14px;font-size:.875rem;
+}
+.notice svg{flex:none;margin-top:2px}
+.notice[hidden]{display:none}
+
+.segment{display:inline-flex;align-self:flex-start;background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+.tab{border:0;background:none;color:var(--muted);padding:7px 16px;border-radius:6px;font-weight:500}
+.tab:hover{border:0;color:var(--ink)}
+.tab[aria-selected="true"]{background:var(--accent-soft);color:var(--accent)}
+
+.panel{display:flex;flex-direction:column;gap:16px}
+.box{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px 20px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px}
+label.lbl{font-size:.75rem;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.search{display:flex;gap:8px;flex-wrap:wrap}
+.field-in{position:relative;flex:1 1 260px;min-width:0}
+.field-in svg{position:absolute;left:14px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.field-in input{
+  width:100%;font:inherit;font-family:var(--font-mono);font-size:1.0625rem;
+  padding:12px 14px 12px 42px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;
+}
+.field-in input::placeholder{color:var(--muted);opacity:.65}
+.field-in input:focus{border-color:var(--accent);background:var(--surface);outline:3px solid var(--accent-soft)}
+.search button.primary{padding-inline:22px}
+.hint{margin:0;color:var(--muted);font-size:.84rem}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{font-family:var(--font-mono);font-size:.78rem;padding:3px 10px;border-radius:999px;background:var(--surface-2);border:1px solid var(--line);color:var(--ink)}
+.chip:hover{border-color:var(--accent);color:var(--accent)}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.card-head{padding:20px 22px;display:flex;gap:16px;align-items:center;border-bottom:1px solid var(--line)}
+.avatar{
+  flex:none;width:52px;height:52px;border-radius:50%;background:var(--accent-soft);color:var(--accent);
+  display:grid;place-items:center;font-weight:600;font-size:1.1rem;letter-spacing:.02em;
+}
+.who{min-width:0;display:flex;flex-direction:column;gap:6px}
+.who h2{margin:0;font-size:1.3rem;line-height:1.2;font-weight:600;overflow-wrap:anywhere;text-wrap:balance}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.tag{font-size:.72rem;font-weight:500;padding:2px 9px;border-radius:999px;background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
+.tag.ok{background:var(--good-soft);color:var(--good);border-color:transparent}
+.tag.warn{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.group-title{
+  margin:0;padding:8px 22px;font-size:.72rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);background:var(--surface-2);border-bottom:1px solid var(--line);
+}
+.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));margin:0}
+.field{padding:14px 22px;border-bottom:1px solid var(--line);min-width:0;display:flex;flex-direction:column;gap:4px}
+.field:nth-child(odd){border-right:1px solid var(--line)}
+.field dt{font-size:.78rem;color:var(--muted)}
+.field dd{margin:0;display:flex;align-items:center;gap:8px;justify-content:space-between;min-width:0}
+.val{font-family:var(--font-mono);font-size:.95rem;font-weight:500;overflow-wrap:anywhere;min-width:0}
+.val.empty{font-family:var(--font-body);font-weight:400;color:var(--muted);font-style:italic}
+.field small{color:var(--warn);font-size:.78rem}
+.copy{padding:3px 9px;font-size:.75rem;flex:none;color:var(--muted)}
+.copy:hover{color:var(--accent);border-color:var(--accent)}
+.card-foot{padding:12px 22px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;background:var(--surface-2)}
+.card-foot span{color:var(--muted);font-size:.78rem}
+
+.list{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+.list-head{padding:10px 18px;color:var(--muted);font-size:.8125rem;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.row{
+  width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:0;background:none;
+  padding:11px 18px;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:center;
+}
+.row:last-child{border-bottom:0}
+.row:hover{background:var(--accent-soft)}
+.row .n{font-weight:500;overflow-wrap:anywhere}
+.row .m{font-family:var(--font-mono);font-size:.8125rem;color:var(--muted)}
+.empty-state{background:var(--surface);border:1px dashed var(--line);border-radius:12px;padding:24px 22px;display:flex;flex-direction:column;gap:10px}
+.empty-state p{margin:0}
+.empty-state .big{font-weight:600}
+.empty-state.bad{border-style:solid;border-color:var(--bad);background:var(--bad-soft)}
+
+textarea{
+  width:100%;min-height:150px;resize:vertical;font-family:var(--font-mono);font-size:.9rem;
+  padding:12px 14px;background:var(--surface-2);color:var(--ink);border:1px solid var(--line);border-radius:8px;
+}
+textarea:focus{border-color:var(--accent);background:var(--surface);outline:3px solid var(--accent-soft)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.summary{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.summary p{margin:0;font-size:.9rem}
+.tablebox{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%;min-width:780px;font-size:.875rem}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--surface-2);white-space:nowrap;font-weight:600}
+tbody tr:hover td{background:var(--surface-2)}
+tr:last-child td{border-bottom:0}
+td.mono{font-family:var(--font-mono);font-size:.8125rem;overflow-wrap:anywhere}
+tr.miss td,tr.miss:hover td{background:var(--bad-soft)}
+tr.miss td:first-child{color:var(--bad);font-weight:600}
+.toast{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:7px;font-size:.875rem;z-index:20;box-shadow:var(--shadow);
+}
+.toast[hidden]{display:none}
+@media (max-width:640px){
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fields{grid-template-columns:minmax(0,1fr)}
+  .field:nth-child(odd){border-right:0}
+  .row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .row .m:last-child{display:none}
+  .card-head{padding:16px}
+  .group-title,.field,.card-foot{padding-left:16px;padding-right:16px}
+}
+@media (prefers-reduced-motion:no-preference){
+  .card{animation:rise .18s ease-out}
+  @keyframes rise{from{opacity:.5;transform:translateY(4px)}to{opacity:1;transform:none}}
+}
+</style>
+
+<div class="bar">
+  <div class="gutter">
+    <div class="brand">
+      <div class="mark" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.9-4.9"/></svg>
+      </div>
+      <div>
+        <h1>Candidate Lookup</h1>
+        <p class="sub">Neo ID and registration records</p>
+      </div>
+    </div>
+    <label class="btn on-bar file-btn" for="listFile">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+      Load a different list
+      <input type="file" id="listFile" accept=".txt,.csv,.tsv,.json,text/plain,text/csv,application/json">
+    </label>
+  </div>
+</div>
+
+<main class="gutter">
+  <div class="stats" id="stats" aria-live="polite"></div>
+  <div class="notice" id="notice" hidden></div>
+
+  <div class="segment" role="tablist">
+    <button class="tab" role="tab" id="tab-single" aria-selected="true" aria-controls="panel-single">Single lookup</button>
+    <button class="tab" role="tab" id="tab-bulk" aria-selected="false" aria-controls="panel-bulk">Bulk lookup</button>
+  </div>
+
+  <section class="panel" id="panel-single" role="tabpanel" aria-labelledby="tab-single">
+    <div class="box">
+      <label class="lbl" for="q">Neo ID or registration number</label>
+      <div class="search">
+        <div class="field-in">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m20 20-4.9-4.9"/></svg>
+          <input id="q" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. X4Z5B5E7 or 23BAI11294">
+        </div>
+        <button class="primary" id="go" type="button">Find</button>
+      </div>
+      <p class="hint">Not case sensitive. A partial ID, name or email lists the closest matches.</p>
+    </div>
+    <div id="single-out" aria-live="polite"></div>
+  </section>
+
+  <section class="panel" id="panel-bulk" role="tabpanel" aria-labelledby="tab-bulk" hidden>
+    <div class="box">
+      <label class="lbl" for="bulkInput">Neo IDs or registration numbers</label>
+      <textarea id="bulkInput" spellcheck="false" placeholder="Paste one per line, or separate with commas or spaces"></textarea>
+      <div class="actions">
+        <button class="primary" id="bulkGo" type="button">Look up all</button>
+        <label class="btn file-btn" for="bulkFile">Upload a file of IDs
+          <input type="file" id="bulkFile" accept=".txt,.csv,.tsv,text/plain,text/csv">
+        </label>
+        <button id="bulkClear" type="button">Clear</button>
+      </div>
+    </div>
+    <div id="bulk-out" aria-live="polite"></div>
+  </section>
+</main>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(function(){
+  "use strict";
+  var DATA = [], byNeo = new Map(), byReg = new Map(), sourceName = "candidates.json";
+  var $ = function(id){ return document.getElementById(id); };
+  var norm = function(s){ return String(s == null ? "" : s).trim().toUpperCase(); };
+  var esc = function(s){ return String(s == null ? "" : s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); };
+  var fmt = function(n){ return n.toLocaleString("en-IN"); };
+
+  /* ---------- data ---------- */
+  function setData(rows, name){
+    DATA = rows; sourceName = name || sourceName;
+    byNeo = new Map(); byReg = new Map();
+    var years = new Set(), codes = new Set(), complete = 0, cutN = 0;
+    rows.forEach(function(r){
+      if (r.neo) byNeo.set(norm(r.neo), r);
+      if (r.reg) byReg.set(norm(r.reg), r);
+      if (r.name && r.reg) complete++;
+      if (/\.\.\.$/.test(r.inst || "")) cutN++;
+      var d = derive(r); if (d){ years.add(d.year); codes.add(d.code); }
+    });
+    var ys = Array.from(years).sort();
+    var range = ys.length ? (ys.length > 1 ? ys[0] + "–" + ys[ys.length - 1] : ys[0]) : "—";
+    $("stats").innerHTML =
+      stat(fmt(rows.length), "Candidates in " + esc(sourceName)) +
+      stat(fmt(complete), "Complete records") +
+      stat(range, "Entry years") +
+      stat(String(codes.size || "—"), "Programme codes");
+    var n = $("notice");
+    if (cutN){
+      n.hidden = false;
+      n.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>' +
+        '<span>Institute email is cut short for ' + fmt(cutN) + ' candidates in this file. Load a complete export to see full addresses.</span>';
+    } else { n.hidden = true; n.innerHTML = ""; }
+    renderSingle(); if (lastBulk) runBulk();
+  }
+  function stat(v, l){ return '<div class="stat"><b>' + esc(v) + '</b><span>' + l + '</span></div>'; }
+  function find(q){ q = norm(q); return byNeo.get(q) || byReg.get(q) || null; }
+
+  function splitLine(line, delim){
+    var out = [], cur = "", inq = false;
+    for (var i = 0; i < line.length; i++){
+      var c = line[i];
+      if (inq){ if (c === '"'){ if (line[i+1] === '"'){ cur += '"'; i++; } else inq = false; } else cur += c; }
+      else if (c === '"') inq = true;
+      else if (c === delim){ out.push(cur); cur = ""; }
+      else cur += c;
+    }
+    out.push(cur); return out;
+  }
+  var KEYS = [
+    ["inst",  /(inst|official|college|university)/i],
+    ["neo",   /neo/i],
+    ["reg",   /reg/i],
+    ["name",  /name/i],
+    ["email", /mail/i]
+  ];
+  function keyFor(h){
+    for (var i = 0; i < KEYS.length; i++) if (KEYS[i][1].test(h)) return KEYS[i][0];
+    return null;
+  }
+  function clean(v){ v = String(v == null ? "" : v).trim(); return v === "-" ? "" : v; }
+
+  function parseList(text){
+    text = text.replace(/^﻿/, "").replace(/\r/g, "");
+    var t = text.trim(), rows = [];
+    if (t[0] === "[" || t[0] === "{"){
+      var j = JSON.parse(t); if (!Array.isArray(j)) j = j.records || j.data || [];
+      j.forEach(function(o){
+        var r = {email:"",name:"",reg:"",neo:"",inst:""};
+        Object.keys(o).forEach(function(k){ var f = keyFor(k); if (f) r[f] = clean(o[k]); });
+        if (r.neo || r.reg) rows.push(r);
+      });
+      return rows;
+    }
+    var lines = text.split("\n").filter(function(l){ return l.trim() !== ""; });
+    if (!lines.length) return rows;
+    var head = lines[0];
+    var tabs = head.indexOf("\t") > -1, commas = head.indexOf(",") > -1;
+    if (tabs || commas){
+      var d = tabs ? "\t" : ",";
+      var names = splitLine(head, d).map(function(h){ return keyFor(h); });
+      lines.slice(1).forEach(function(l){
+        var p = splitLine(l, d), r = {email:"",name:"",reg:"",neo:"",inst:""};
+        names.forEach(function(f, i){ if (f && p[i] != null) r[f] = clean(p[i]); });
+        if (r.neo || r.reg) rows.push(r);
+      });
+      return rows;
+    }
+    /* fixed-width table, as printed by PowerShell Format-Table */
+    var re = /\S+/g, m, starts = [], keys = [];
+    while ((m = re.exec(head))){ starts.push(m.index); keys.push(keyFor(m[0])); }
+    lines.slice(1).forEach(function(l){
+      if (/^[-\s]+$/.test(l)) return;
+      var r = {email:"",name:"",reg:"",neo:"",inst:""};
+      keys.forEach(function(f, i){
+        if (!f) return;
+        var end = i + 1 < starts.length ? starts[i+1] : l.length;
+        r[f] = clean(l.slice(starts[i], end));
+      });
+      if (/^neo/i.test(r.neo) || /^registration/i.test(r.reg)) return; /* repeated header row */
+      if (r.neo || r.reg) rows.push(r);
+    });
+    return rows;
+  }
+
+  /* ---------- helpers ---------- */
+  var toastTimer;
+  function toast(msg){
+    var t = $("toast"); t.textContent = msg; t.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(function(){ t.hidden = true; }, 1800);
+  }
+  function copyText(text, done){
+    function fallback(){
+      var ta = document.createElement("textarea"); ta.value = text;
+      ta.style.cssText = "position:fixed;opacity:0;top:0;left:0"; document.body.appendChild(ta);
+      ta.select(); var ok = false; try { ok = document.execCommand("copy"); } catch(e){}
+      document.body.removeChild(ta); toast(ok ? (done || "Copied") : "Copy failed. Select the text and copy it.");
+    }
+    try {
+      navigator.clipboard.writeText(text).then(function(){ toast(done || "Copied"); }, fallback);
+    } catch(e){ fallback(); }
+  }
+  function derive(r){
+    var m = /^(\d{2})([A-Za-z]{3})\d+/.exec(r.reg || "");
+    return m ? {year: "20" + m[1], code: m[2].toUpperCase()} : null;
+  }
+  function regOdd(r){ return r.reg && !/^\d{2}[A-Za-z]{3}\d{5}$/.test(r.reg); }
+  function cut(v){ return /\.\.\.$/.test(v || ""); }
+  function initials(n){
+    var p = String(n || "").replace(/[^A-Za-z\s]/g, " ").trim().split(/\s+/).filter(Boolean);
+    if (!p.length) return "?";
+    return (p[0][0] + (p.length > 1 ? p[p.length - 1][0] : "")).toUpperCase();
+  }
+
+  /* ---------- single lookup ---------- */
+  var selected = null;
+  function field(label, value, opts){
+    opts = opts || {};
+    var body = value
+      ? '<span class="val">' + esc(value) + '</span><button class="copy" type="button" data-copy="' + esc(value) + '" aria-label="Copy ' + esc(label) + '">Copy</button>'
+      : '<span class="val empty">Not in the list</span>';
+    return '<div class="field"><dt>' + esc(label) + '</dt><dd>' + body + '</dd>' +
+      (opts.note ? '<small>' + esc(opts.note) + '</small>' : '') + '</div>';
+  }
+  function cardHtml(r){
+    var d = derive(r), tags = "";
+    if (d) tags += '<span class="tag ok">Entry year ' + d.year + '</span><span class="tag">Programme code ' + d.code + '</span>';
+    if (!r.name || !r.reg) tags += '<span class="tag warn">Incomplete record</span>';
+    if (regOdd(r)) tags += '<span class="tag warn">Registration number looks irregular</span>';
+    var all = [
+      "Name: " + (r.name || "-"), "Registration number: " + (r.reg || "-"), "Neo ID: " + (r.neo || "-"),
+      "Personal email: " + (r.email || "-"), "Institute email: " + (r.inst || "-")
+    ].join("\n");
+    return '<article class="card">' +
+      '<div class="card-head"><div class="avatar" aria-hidden="true">' + esc(initials(r.name)) + '</div>' +
+      '<div class="who"><h2>' + esc(r.name || "Name not in the list") + '</h2>' +
+      (tags ? '<div class="tags">' + tags + '</div>' : '') + '</div></div>' +
+      '<h3 class="group-title">Identifiers</h3>' +
+      '<dl class="fields">' + field("Registration number", r.reg) + field("Neo ID", r.neo) + '</dl>' +
+      '<h3 class="group-title">Contact</h3>' +
+      '<dl class="fields">' + field("Personal email", r.email) +
+        field("Institute email", r.inst, cut(r.inst) ? {note:"Cut short in the uploaded file"} : {}) + '</dl>' +
+      '<div class="card-foot"><span>Entry year and programme code are read from the registration number.</span>' +
+      '<button type="button" data-copy="' + esc(all) + '" data-done="Copied all details">Copy all details</button></div>' +
+    '</article>';
+  }
+  function examples(){
+    var picks = [], i = 0;
+    while (picks.length < 2 && i < DATA.length){ if (DATA[i].neo && DATA[i].reg) picks.push(DATA[i]); i += 337; }
+    return picks;
+  }
+  function renderSingle(){
+    var q = $("q").value.trim(), out = $("single-out");
+    if (!q){
+      var ex = examples();
+      out.innerHTML = '<div class="empty-state"><p class="big">Enter an ID to see the candidate’s full record.</p>' +
+        '<p class="hint">To check many at once, use Bulk lookup.</p>' +
+        (ex.length ? '<div class="chips"><span class="hint">Try</span>' + ex.map(function(r){
+          return '<button type="button" class="chip" data-q="' + esc(r.neo) + '">' + esc(r.neo) + '</button>' +
+                 '<button type="button" class="chip" data-q="' + esc(r.reg) + '">' + esc(r.reg) + '</button>';
+        }).join("") + '</div>' : '') + '</div>';
+      return;
+    }
+    var exact = selected || find(q);
+    if (exact){ out.innerHTML = cardHtml(exact); return; }
+    var ql = q.toLowerCase(), hits = [];
+    if (q.length >= 2){
+      for (var i = 0; i < DATA.length && hits.length < 200; i++){
+        var r = DATA[i];
+        if ((r.neo && r.neo.toLowerCase().indexOf(ql) === 0) || (r.reg && r.reg.toLowerCase().indexOf(ql) === 0) ||
+            (r.name && r.name.toLowerCase().indexOf(ql) > -1) || (r.email && r.email.toLowerCase().indexOf(ql) > -1)) hits.push(r);
+      }
+    }
+    if (!hits.length){
+      out.innerHTML = '<div class="empty-state bad"><p class="big">No candidate matches “' + esc(q) + '”.</p>' +
+        '<p class="hint">Check the ID for typos. A Neo ID is 8 characters, such as ' + esc((DATA[0] && DATA[0].neo) || "X4Z5B5E7") + '.</p></div>';
+      return;
+    }
+    var shown = hits.slice(0, 25);
+    out.innerHTML = '<div class="list"><div class="list-head">' + (hits.length > 25 ? "First 25 of " + (hits.length >= 200 ? "200+" : hits.length) : hits.length) +
+      ' possible matches. Pick one to see the full record.</div>' + shown.map(function(r){
+        return '<button type="button" class="row" data-i="' + DATA.indexOf(r) + '"><span class="n">' + esc(r.name || "Name not in the list") +
+          '</span><span class="m">' + esc(r.reg || "no reg. no.") + '</span><span class="m">' + esc(r.neo) + '</span></button>';
+      }).join("") + '</div>';
+  }
+
+  /* ---------- bulk lookup ---------- */
+  var lastBulk = null;
+  function tokens(text){
+    var seen = new Set(), out = [];
+    text.split(/[\s,;|]+/).forEach(function(t){
+      t = t.replace(/^["']+|["']+$/g, ""); if (!t) return;
+      var k = norm(t); if (seen.has(k)) return; seen.add(k); out.push(t);
+    });
+    return out;
+  }
+  function runBulk(){
+    var text = $("bulkInput").value, out = $("bulk-out");
+    var toks = tokens(text);
+    if (!toks.length){ lastBulk = null; out.innerHTML = '<div class="empty-state"><p class="big">Paste IDs above to see every candidate’s details in one table.</p><p class="hint">Neo IDs and registration numbers can be mixed in the same list.</p></div>'; return; }
+    var res = toks.map(function(t){ return {input:t, rec:find(t)}; });
+    lastBulk = res;
+    var found = res.filter(function(x){ return x.rec; }).length, miss = res.length - found;
+    var rows = res.map(function(x){
+      var r = x.rec;
+      return r
+        ? '<tr><td class="mono">' + esc(x.input) + '</td><td>' + esc(r.name || "—") + '</td><td class="mono">' + esc(r.reg || "—") + '</td><td class="mono">' +
+          esc(r.neo) + '</td><td class="mono">' + esc(r.email || "—") + '</td><td class="mono">' + esc(r.inst || "—") + '</td></tr>'
+        : '<tr class="miss"><td class="mono">' + esc(x.input) + '</td><td colspan="5">Not found in the list</td></tr>';
+    }).join("");
+    out.innerHTML = '<div class="summary"><p><b>' + found + '</b> of ' + res.length + ' found' + (miss ? ' · <b style="color:var(--bad)">' + miss + ' not found</b>' : '') + '</p>' +
+      '<div class="actions"><button type="button" id="copyTable">Copy results</button>' +
+      (miss ? '<button type="button" id="copyMiss">Copy not-found IDs</button>' : '') + '</div></div>' +
+      '<div class="tablebox"><table><thead><tr><th>You entered</th><th>Name</th><th>Reg. no.</th><th>Neo ID</th><th>Personal email</th><th>Institute email</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+  }
+
+  /* ---------- events ---------- */
+  function readFile(file, cb){
+    var fr = new FileReader(); fr.onload = function(){ cb(String(fr.result)); };
+    fr.onerror = function(){ toast("Could not read that file."); }; fr.readAsText(file);
+  }
+  $("q").addEventListener("input", function(){ selected = null; renderSingle(); });
+  $("q").addEventListener("keydown", function(e){ if (e.key === "Enter"){ selected = null; renderSingle(); } });
+  $("go").addEventListener("click", function(){ selected = null; renderSingle(); $("q").focus(); });
+  $("single-out").addEventListener("click", function(e){
+    var c = e.target.closest("[data-copy]"), q = e.target.closest("[data-q]"), row = e.target.closest("[data-i]");
+    if (c) copyText(c.getAttribute("data-copy"), c.getAttribute("data-done") || "Copied");
+    else if (q){ $("q").value = q.getAttribute("data-q"); selected = null; renderSingle(); }
+    else if (row){ selected = DATA[+row.getAttribute("data-i")]; renderSingle(); }
+  });
+  function showTab(which){
+    ["single","bulk"].forEach(function(n){
+      $("tab-" + n).setAttribute("aria-selected", String(n === which));
+      $("panel-" + n).hidden = n !== which;
+    });
+  }
+  $("tab-single").addEventListener("click", function(){ showTab("single"); });
+  $("tab-bulk").addEventListener("click", function(){ showTab("bulk"); });
+  $("bulkGo").addEventListener("click", runBulk);
+  $("bulkClear").addEventListener("click", function(){ $("bulkInput").value = ""; runBulk(); });
+  $("bulkFile").addEventListener("change", function(e){
+    var f = e.target.files[0]; if (!f) return;
+    readFile(f, function(text){
+      /* if the file is a spreadsheet-style table, take the Neo ID and registration columns only */
+      var first = text.split(/\r?\n/, 1)[0] || "", ids;
+      if (/neo|reg/i.test(first) && /[,\t]/.test(first)){
+        var d = first.indexOf("\t") > -1 ? "\t" : ",", heads = splitLine(first, d).map(keyFor), want = [];
+        heads.forEach(function(h, i){ if (h === "neo" || h === "reg") want.push(i); });
+        ids = text.replace(/\r/g, "").split("\n").slice(1).map(function(l){
+          var p = splitLine(l, d); return want.map(function(i){ return clean(p[i]); }).filter(Boolean).join(" ");
+        }).join("\n");
+      } else ids = text;
+      $("bulkInput").value = ids.trim(); runBulk(); e.target.value = "";
+    });
+  });
+  $("bulk-out").addEventListener("click", function(e){
+    if (!lastBulk) return;
+    if (e.target.id === "copyTable"){
+      var lines = ["You entered\tName\tReg. no.\tNeo ID\tPersonal email\tInstitute email"].concat(lastBulk.map(function(x){
+        var r = x.rec; return r ? [x.input, r.name, r.reg, r.neo, r.email, r.inst].join("\t") : [x.input, "NOT FOUND", "", "", "", ""].join("\t");
+      }));
+      copyText(lines.join("\n"), "Copied. Paste into Excel or Sheets.");
+    } else if (e.target.id === "copyMiss"){
+      copyText(lastBulk.filter(function(x){ return !x.rec; }).map(function(x){ return x.input; }).join("\n"), "Copied not-found IDs");
+    }
+  });
+  $("listFile").addEventListener("change", function(e){
+    var f = e.target.files[0]; if (!f) return;
+    readFile(f, function(text){
+      try {
+        var rows = parseList(text);
+        if (!rows.length){ toast("No Neo IDs or registration numbers found in that file."); return; }
+        selected = null; setData(rows, f.name); toast("Loaded " + fmt(rows.length) + " candidates");
+      } catch(err){ toast("That file could not be read as a list."); }
+      e.target.value = "";
+    });
+  });
+
+  /* ---------- start ---------- */
+  runBulk(); renderSingle();
+  fetch("candidates.json").then(function(r){ return r.json(); }).then(function(rows){
+    setData(rows, "your list");
+  }).catch(function(){
+    $("stats").innerHTML = "";
+    $("notice").hidden = false;
+    $("notice").innerHTML = "<span>The built-in list did not load. Use <b>Load a different list</b> to add one.</span>";
+  });
+})();
+</script>
+
+</body></html>
